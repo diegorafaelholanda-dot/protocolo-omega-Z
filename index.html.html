@@ -1,0 +1,159 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Protocolo Ômega — Sobrevivência Z</title>
+<style>
+:root{--bg:#0b0e14;--p:#141a24;--t:#e6edf3;--g:#39ff88;--r:#ff4d4d;--a:#ffb020;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--t);font-family:system-ui,sans-serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#app{height:100%;display:flex;flex-direction:column}
+#hud{display:flex;justify-content:space-between;align-items:center;padding:6px 12px 0;font-weight:700;font-size:15px}
+#msg{text-align:center;font-size:12px;color:var(--a);padding:2px 8px 4px;min-height:16px}
+#wrap{flex:1;min-height:0;display:flex;justify-content:center}
+canvas{height:100%;width:auto;image-rendering:pixelated;background:#000;border:2px solid #263042;border-radius:6px}
+#ctl{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 12px}
+.dp{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:4px}
+.b{background:#1c2535;border:1px solid #33425c;border-radius:12px;color:var(--t);font-size:22px;display:flex;align-items:center;justify-content:center}
+.b:active{background:#2c3e5c}
+button{font:inherit;color:inherit}
+#act{width:92px;height:92px;border-radius:50%;background:#10381f;border:2px solid #2f7a4a;font-weight:800;font-size:14px}
+#act.rdy{border-color:var(--g);background:#14532d;animation:pl .7s infinite alternate}
+@keyframes pl{to{box-shadow:0 0 20px var(--g)}}
+#menu{background:#1c2535;border:1px solid #33425c;border-radius:8px;padding:2px 8px;font-size:14px}
+#ov{position:fixed;inset:0;background:rgba(5,8,12,.9);display:none;align-items:center;justify-content:center;padding:12px;z-index:9}
+.card{background:var(--p);border:1px solid #2a3850;border-radius:14px;padding:16px;max-width:420px;width:100%;max-height:100%;overflow:auto;touch-action:pan-y;font-size:14px;line-height:1.45}
+.card h2{margin:0 0 6px;color:var(--g);font-size:20px}
+.tag{font-size:11px;color:var(--a);font-weight:700;letter-spacing:.5px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
+.chips i{font-style:normal;background:#1c2535;border:1px solid #3a4c6b;border-radius:8px;padding:4px 9px;font-weight:700}
+#disp{background:#06110b;border:1px solid var(--g);color:var(--g);font:700 26px monospace;text-align:center;padding:8px;border-radius:8px;margin:8px 0}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.kb{background:#1c2535;border:1px solid #33425c;border-radius:10px;padding:12px 0;font-size:20px;font-weight:700}
+.kb:active{background:#2c3e5c}
+.go{background:#14532d;border:1px solid var(--g);border-radius:10px;padding:12px;width:100%;font-weight:800;font-size:16px;margin-top:10px}
+.lnk{background:none;border:none;color:#8fb4ff;padding:10px 8px 0;font-size:13px}
+.hn{color:#9fe0ff;font-size:13px;margin:4px 0}
+.fm{background:#0d1320;border-radius:8px;padding:8px;font-family:monospace;font-size:12.5px;margin:8px 0}
+.ok{color:var(--g)}.no{color:var(--r)}
+ol{padding-left:18px;margin:6px 0}
+</style></head><body>
+<div id="app">
+<div id="hud"><span id="hp"></span><span id="sc">⚡ 0/5</span><button id="menu">📖 Guia</button></div>
+<div id="msg"></div>
+<div id="wrap"><canvas id="c" width="192" height="224"></canvas></div>
+<div id="ctl">
+<div class="dp"><span></span><button class="b" data-d="u">▲</button><span></span><button class="b" data-d="l">◀</button><span></span><button class="b" data-d="r">▶</button><span></span><button class="b" data-d="d">▼</button><span></span></div>
+<button id="act">AÇÃO</button>
+</div></div>
+<div id="ov"><div class="card" id="card"></div></div>
+<script>
+const T=16,W=12,TOT=5;
+const M=["WWWWWWWWWWWW","WMT..XX..TMW","W..........W","WWW..MM..WWW","WM........MW","W..WW..WW..W","W..WT..W...W","W..WW..WW..W","W..........W","WM........MW","WWW..TT..WWW","W..........W","WM...PP...MW","WWWWWWWWWWWW"];
+const TS=[[2,1],[9,1],[4,6],[5,10],[6,10]],ZS=[[3,2],[8,4],[2,6],[9,8],[9,11]];
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+// ---------- matemática ----------
+const f=n=>n<2?1:n*f(n-1),R=a=>a[Math.floor(Math.random()*a.length)],ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const L='ABCDEFGHIJ';
+const wd=['ZUMBI','CURA','VIRUS','ABRIGO','FUGA','LOTE'],wr=['SALA','OSSO','ARARA','BANANA','CASA','MASSA','VACINA','PANDEMIA','ANTIDOTO'];
+const HS='Permutação simples: Pn = n!',HR='Com repetição: n! ÷ (a! · b! · …), onde a, b… são as quantidades repetidas.',HC='Permutação circular: PCn = (n − 1)!';
+const HJ='Para ficar juntos, trate o par como UM bloco e depois multiplique por 2! (ordem interna).';
+const G={
+0(){const n=ri(4,7);return{t:'Permutação simples',x:`O cofre tem <b>${n} frascos de amostras diferentes</b>. De quantas formas podemos alinhá-los na bancada?`,k:[...L.slice(0,n)],a:f(n),s:`P${n} = ${n}! = ${f(n)}`,h:HS}},
+1(){const w=R(wd);return{t:'Permutação simples',x:`A senha é qualquer <b>anagrama</b> (com ou sem sentido) da palavra <b>${w}</b>. Quantas senhas existem?`,k:[...w],a:f(w.length),s:`Letras todas diferentes: ${w.length}! = ${f(w.length)}`,h:HS}},
+2(){const n=ri(4,6);return{t:'Permutação com restrição',x:`<b>${n} sobreviventes</b> passam em fila pela porta. <b>A e B são irmãos</b> e devem ficar sempre lado a lado. Quantas filas são possíveis?`,k:[...L.slice(0,n)],a:2*f(n-1),s:`Bloco (AB) + ${n-2} pessoas = ${n-1} unidades: ${n-1}! · 2! = ${2*f(n-1)}`,h:HJ}},
+3(){const n=ri(5,7);return{t:'Permutação com restrição',x:`<b>${n} pessoas</b> entram em fila, mas o <b>Dr. Aris (A) sempre abre a fila</b>. Quantas filas diferentes?`,k:[...L.slice(0,n)],a:f(n-1),s:`Aris fixo na 1ª posição; os outros ${n-1} se permutam: ${n-1}! = ${f(n-1)}`,h:'Fixe quem tem posição obrigatória e permute o resto.'}},
+4(){const w=R(wr),m={};[...w].forEach(c=>m[c]=(m[c]||0)+1);const v=Object.values(m).filter(k=>k>1),a=f(w.length)/v.reduce((p,k)=>p*f(k),1);return{t:'Permutação com repetição',x:`Quantos <b>anagramas</b> tem a palavra <b>${w}</b>?`,k:[...w],a,s:`${w.length}! ÷ (${v.map(k=>k+'!').join(' · ')}) = ${f(w.length)} ÷ ${v.reduce((p,k)=>p*f(k),1)} = ${a}`,h:HR}},
+5(){const a=ri(2,3),b=ri(1,2),c=ri(1,2),n=a+b+c,p=f(a)*f(b)*f(c);return{t:'Permutação com repetição',x:`Alinhe <b>${a} ampolas vermelhas, ${b} azul(is) e ${c} verde(s)</b>. Ampolas da mesma cor são idênticas. Quantas sequências diferentes?`,k:['🔴'.repeat(a),'🔵'.repeat(b),'🟢'.repeat(c)],a:f(n)/p,s:`${n}! ÷ (${a}! · ${b}! · ${c}!) = ${f(n)} ÷ ${p} = ${f(n)/p}`,h:HR}},
+6(){const n=ri(4,8);return{t:'Permutação circular',x:`<b>${n} sobreviventes</b> sentam em volta da fogueira. Rotações da mesma disposição contam como <b>uma só</b>. Quantas formas existem?`,k:[...L.slice(0,n)],a:f(n-1),s:`PC${n} = (${n}−1)! = ${n-1}! = ${f(n-1)}`,h:HC}},
+7(){const n=ri(5,7);return{t:'Permutação circular',x:`<b>${n} cientistas</b> se sentam à mesa redonda. <b>Dois deles (A e B) querem ficar juntos</b>. Quantas disposições?`,k:[...L.slice(0,n)],a:2*f(n-2),s:`Bloco (AB) + ${n-2} = ${n-1} unidades em círculo: (${n-1}−1)! · 2! = ${f(n-2)} · 2 = ${2*f(n-2)}`,h:'Forme o bloco, faça a circular com as unidades e multiplique por 2!.'}}
+};
+const GR=[[0,1],[2,3],[4,5],[6],[7,6]];
+// ---------- áudio ----------
+let AC;function snd(fr,d,ty='square',v=.07,sl=0,dl=0){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain(),s=AC.currentTime+dl;o.type=ty;o.frequency.setValueAtTime(fr,s);if(sl)o.frequency.linearRampToValueAtTime(Math.max(20,fr+sl),s+d);g.gain.setValueAtTime(v,s);g.gain.exponentialRampToValueAtTime(.001,s+d);o.connect(g);g.connect(AC.destination);o.start(s);o.stop(s+d)}catch(e){}}
+const sOk=()=>[523,659,784,1047].forEach((q,i)=>snd(q,.15,'square',.07,0,i*.09)),sBad=()=>{snd(150,.45,'sawtooth',.1,-90);snd(110,.4,'square',.08,-60,.12)},sHit=()=>snd(200,.3,'sawtooth',.12,-150);
+// ---------- sprites pixel art ----------
+function spr(rows,pal){const c=document.createElement('canvas');c.width=rows[0].length;c.height=rows.length;const x=c.getContext('2d');rows.forEach((r,j)=>[...r].forEach((ch,i)=>{if(pal[ch]){x.fillStyle=pal[ch];x.fillRect(i,j,1,1)}}));return c}
+const DOC=spr(["..hhhhhh....",".hhhhhhhhh..",".hhsssshhh..",".hgggsgggh..","..ssssss....","..wwkkww....",".wwwwkwwww..","wwcwwkwwcww.","wwcwwkwwcww.","sswwwkwwwss.",".wwwwkwwww..","..nnn.nnn...","..nnn.nnn...",".bbbb.bbbb..",".bbbb.bbbb.."],{h:'#1d2347',s:'#f0c8a0',g:'#8a93a3',w:'#e6ecf8',c:'#aab4cc',k:'#10141a',n:'#232f5e',b:'#3a2418'});
+const ZR=["..rr.rr.rr..",".rrbbbbbrr..",".rbbkbbkbr..","..bbkkkbb...","...rkkkr....",".aaAAAAaa...","rraAaaAarr..","rrAaaaaArr..","rrAAaaAArrr.","rrrAAAArrr..",".rr.AAAA.rr.","....pppp....","...pp..pp...","..dd....dd.."];
+const ZP=[{r:'#a31b1b',d:'#5a1010',b:'#e8d8b0'},{r:'#7d1230',d:'#3d0818',b:'#cfc3a0'},{r:'#4c8a3c',d:'#24521f',b:'#e0e6b0'}];
+const ZSP=ZP.map(p=>spr(ZR,{...p,k:'#0a0a0a',a:'#5b6272',A:'#2d323d',p:'#3b3d4a'}));
+// ---------- estado ----------
+let st='intro',P,Z,TM,hp,alertT,emp,parts,flash,err,time,open,solved,cur,buf,near=-1,tA=0;
+const keys={},dp={};
+const dust=Array.from({length:22},()=>({x:Math.random()*192,y:Math.random()*224,s:2+Math.random()*5}));
+const blood=Array.from({length:16},()=>[ri(2,9)*T+ri(0,10),ri(2,11)*T+ri(0,10),ri(2,6),ri(1,3)]);
+function reset(){P={x:96,y:12.8*T,fx:1,inv:0,w:0,st:0};hp=3;alertT=0;err=0;parts=[];emp=null;time=0;open=false;solved=0;flash=0;
+TM=TS.map((p,i)=>({x:p[0],y:p[1],done:0,g:G[R(GR[i])],gi:i,q:null}));
+Z=ZS.map((p,i)=>({x:p[0]*T+8,y:p[1]*T+14,v:i%3,fx:1,t:0,dx:0,dy:0,stun:0,sp:24+i*2,w:Math.random()*9}));
+hud();msg('Procure os terminais que piscam ⚡')}
+const hud=()=>{$('hp').textContent='❤️'.repeat(hp)+'🖤'.repeat(3-hp);$('sc').textContent='⚡ '+solved+'/'+TOT};
+const msg=t=>$('msg').textContent=t;
+// ---------- colisão e movimento ----------
+const sol=(x,y)=>{const c=M[y]?.[x];return !c||c=='W'||c=='M'||c=='T'||(c=='X'&&!open)};
+const free=(x,y)=>![[-4,-5],[4,-5],[-4,0],[4,0]].some(([a,b])=>sol(Math.floor((x+a)/T),Math.floor((y+b)/T)));
+function mv(e,dx,dy){if(free(e.x+dx,e.y))e.x+=dx;if(free(e.x,e.y+dy))e.y+=dy}
+function burst(x,y,c,n){for(let i=0;i<n;i++){const a=Math.random()*6.28,s=15+Math.random()*45;parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:.6+Math.random()*.5,c})}}
+// ---------- atualização ----------
+function upd(dt){time+=dt;tA+=dt;
+let ax=(keys.r|0)-(keys.l|0)+(dp.r|0)-(dp.l|0),ay=(keys.d|0)-(keys.u|0)+(dp.d|0)-(dp.u|0);const l=Math.hypot(ax,ay);
+if(l>0){ax/=l;ay/=l;mv(P,ax*52*dt,ay*52*dt);P.w+=dt*10;if(ax)P.fx=ax>0?1:-1;P.st-=dt;if(P.st<=0){P.st=.3;snd(70,.05,'triangle',.04)}}
+if(P.inv>0)P.inv-=dt;if(alertT>0)alertT-=dt;if(flash>0)flash-=dt;
+Z.forEach(z=>{if(z.stun>0){z.stun-=dt;return}
+const d=Math.hypot(P.x-z.x,P.y-z.y)||1,ch=d<64||alertT>0;let vx,vy,s;
+if(ch){vx=(P.x-z.x)/d;vy=(P.y-z.y)/d;s=z.sp*(alertT>0?1.2:1)}else{z.t-=dt;if(z.t<=0){z.t=1+Math.random()*2;const a=Math.random()*6.28,m=Math.random()<.3?0:1;z.dx=Math.cos(a)*m;z.dy=Math.sin(a)*m}vx=z.dx;vy=z.dy;s=z.sp*.5}
+mv(z,vx*s*dt,vy*s*dt);if(Math.abs(vx)>.1)z.fx=vx>0?1:-1;if(vx||vy)z.w+=dt*6;
+if(d<9&&P.inv<=0){hp--;P.inv=1.5;flash=.4;sHit();hud();const k=14/d;mv(P,(P.x-z.x)*k,(P.y-z.y)*k);burst(P.x,P.y-6,'#c01818',10);if(hp<=0)dead()}});
+near=-1;TM.forEach((m,i)=>{if(!m.done&&Math.hypot(P.x-(m.x*T+8),P.y-5-(m.y*T+8))<24)near=i});
+$('act').classList.toggle('rdy',near>=0);
+if(open&&M[Math.floor((P.y-3)/T)][Math.floor(P.x/T)]=='X')win();
+parts.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt});parts=parts.filter(p=>p.l>0);
+if(emp){emp.r+=dt*230;if(emp.r>280)emp=null}
+dust.forEach(d=>{d.y-=d.s*dt;d.x+=d.s*dt*.4;if(d.y<0){d.y=224;d.x=Math.random()*192}})}
+// ---------- desenho ----------
+function drawMap(t){for(let y=0;y<14;y++)for(let x=0;x<W;x++){const c=M[y][x],px=x*T,py=y*T;
+ctx.fillStyle=(x+y)%2?'#3b4150':'#383d4b';ctx.fillRect(px,py,T,T);ctx.fillStyle='#2a2f3b';ctx.fillRect(px,py,T,1);ctx.fillRect(px,py,1,T);ctx.fillStyle='#4d5467';ctx.fillRect(px+2,py+2,1,1);ctx.fillRect(px+13,py+13,1,1);
+if(c=='W'){ctx.fillStyle='#1c212d';ctx.fillRect(px,py,T,T);ctx.fillStyle='#2e3850';ctx.fillRect(px,py,T,4);ctx.fillStyle='#0e1118';ctx.fillRect(px,py+13,T,3)}
+else if(c=='M'){ctx.fillStyle='#1d222e';ctx.fillRect(px,py,T,T);ctx.fillStyle='#303a4d';ctx.fillRect(px+1,py+1,14,10);ctx.fillStyle='#151a24';for(let i=0;i<4;i++)ctx.fillRect(px+3+i*3,py+3,2,6);ctx.fillStyle=((t*2+x+y)|0)%2?'#39ff88':'#ffb020';ctx.fillRect(px+3,py+12,2,2);ctx.fillStyle='#ff4d4d';ctx.fillRect(px+10,py+12,2,2)}
+else if(c=='T'){const m=TM.find(q=>q.x==x&&q.y==y);ctx.fillStyle='#1d222e';ctx.fillRect(px,py,T,T);ctx.fillStyle='#2b3345';ctx.fillRect(px+1,py+2,14,12);ctx.fillStyle=m.done?'#39ff88':(((t*3)|0)%2?'#ffb020':'#7a5410');ctx.fillRect(px+3,py+4,10,6);ctx.fillStyle='rgba(0,0,0,.35)';for(let i=0;i<3;i++)ctx.fillRect(px+3,py+5+i*2,10,1);ctx.fillStyle='#10141a';ctx.fillRect(px+3,py+11,10,2)}
+else if(c=='X'){for(let i=0;i<4;i++){ctx.fillStyle=open?(i%2?'#1f7a46':'#39ff88'):(i%2?'#e0b000':'#111');ctx.fillRect(px,py+i*4,T,4)}}}
+ctx.fillStyle='rgba(110,16,16,.55)';blood.forEach(b=>ctx.fillRect(...b))}
+function ent(s,e,fl,moving){const bob=moving&&Math.sin(e.w)>0?-1:0;ctx.save();ctx.translate(Math.round(e.x),Math.round(e.y-s.height+1+bob));ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(-4,s.height-bob-1,8,2);if(fl<0)ctx.scale(-1,1);ctx.drawImage(s,-6,0);ctx.restore()}
+function draw(t){drawMap(t);
+const es=[{y:P.y,f:()=>{if(P.inv>0&&((t*14)|0)%2)return;ent(DOC,P,P.fx,dp.l|dp.r|dp.u|dp.d|keys.l|keys.r|keys.u|keys.d)}},...Z.map(z=>({y:z.y,f:()=>{ctx.globalAlpha=z.stun>0?.55:1;ent(ZSP[z.v],z,z.fx,1);ctx.globalAlpha=1;if(z.stun>0){ctx.fillStyle='#7fd0ff';ctx.font='8px sans-serif';ctx.fillText('⚡',z.x-4,z.y-15)}}}))].sort((a,b)=>a.y-b.y);es.forEach(e=>e.f());
+if(emp){ctx.strokeStyle='rgba(120,220,255,'+Math.max(0,1-emp.r/280)+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(emp.x,emp.y,emp.r,0,6.28);ctx.stroke()}
+parts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,2,2)});
+ctx.fillStyle='rgba(200,220,255,.25)';dust.forEach(d=>ctx.fillRect(d.x,d.y,1,1));
+const fl=.62+Math.sin(t*23)*.03+(Math.random()<.01?.12:0),g=ctx.createRadialGradient(P.x,P.y-6,26,P.x,P.y-6,115);g.addColorStop(0,'rgba(0,0,12,0)');g.addColorStop(1,'rgba(0,0,12,'+fl+')');ctx.fillStyle=g;ctx.fillRect(0,0,192,224);
+TM.forEach(m=>{if(!m.done&&((t*3)|0)%2){ctx.fillStyle='#ffb020';ctx.font='bold 9px sans-serif';ctx.fillText('!',m.x*T+6,m.y*T-1)}});
+if(open){ctx.fillStyle='#39ff88';ctx.font='bold 8px sans-serif';ctx.fillText('SAÍDA ▲',72,36+Math.sin(t*5)*2)}
+if(alertT>0){ctx.fillStyle='rgba(255,0,0,'+(.1+.08*Math.sin(t*12))+')';ctx.fillRect(0,0,192,224)}
+if(flash>0){ctx.fillStyle='rgba(255,0,0,'+flash+')';ctx.fillRect(0,0,192,224)}}
+// ---------- interface ----------
+const ov=h=>{$('card').innerHTML=h;$('ov').style.display='flex'},cl=()=>$('ov').style.display='none';
+const FM=`<div class="fm"><b>Fórmulas</b><br>Simples: Pₙ = n!<br>Com repetição: n! ÷ (a!·b!·…)<br>Circular: PCₙ = (n−1)!</div>`;
+function guide(first){const was=st;if(!first)st='modal';ov(`<h2>☣️ Protocolo Ômega</h2><p><b>Ano 2031.</b> Você é o <b>Dr. Aris</b>, pesquisador do Laboratório Ômega. Um vírus escapou da Câmara 7 e transformou toda a equipe em zumbis. O antídoto só pode ser sintetizado reiniciando <b>5 terminais</b>, cada um trancado por um <b>cadeado numérico</b>: o número de <b>permutações</b> possíveis de amostras, senhas e pessoas. Ative todos e fuja pela saída!</p><b>Como jogar</b><ol><li>Mova o Dr. Aris com o direcional (ou setas/WASD).</li><li>Chegue perto de um terminal piscando e toque <b>AÇÃO</b> (ou E/Espaço).</li><li>Calcule quantas permutações existem e digite o número.</li><li><b>Acertou?</b> Um pulso EMP paralisa os zumbis. <b>Errou?</b> O alarme os atrai!</li><li>Você tem 3 vidas ❤️. Com 5 terminais ativos, a saída abre.</li></ol>${FM}<button class="go" onclick="${first?'start()':'resume()'}">${first?'COMEÇAR':'CONTINUAR'}</button>`)}
+function start(){reset();cl();st='play';snd(330,.2,'triangle',.08,200);drone()}
+function resume(){cl();st='play'}
+function drone(){if(drone.o)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=48;g.gain.value=.03;o.connect(g);g.connect(AC.destination);o.start();drone.o=1}catch(e){}}
+function act(){if(st!='play')return;if(near>=0)openT(near);else msg(open?'A saída está aberta! Corra para o portão ▲':'Aproxime-se de um terminal piscando ⚡')}
+function openT(i){st='modal';cur=i;if(!TM[i].q)TM[i].q=TM[i].g();showQ()}
+function showQ(){const q=TM[cur].q;buf='';ov(`<div class="tag">🖥️ TERMINAL ${cur+1}/${TOT} · ${q.t.toUpperCase()}</div><p>${q.x}</p><div class="chips">${q.k.map(c=>`<i>${c}</i>`).join('')}</div><div id="disp">—</div><div class="hn" id="hn"></div><div class="kp">${[1,2,3,4,5,6,7,8,9,'⌫',0,'OK'].map(k=>`<button class="kb" onclick="key('${k}')">${k}</button>`).join('')}</div><button class="lnk" onclick="document.getElementById('hn').textContent='💡 '+TM[cur].q.h">💡 Dica</button><button class="lnk" onclick="resume()">Sair do terminal</button>`)}
+function key(k){if(st!='modal'||!$('disp'))return;if(k=='OK')return check();if(k=='⌫')buf=buf.slice(0,-1);else if(buf.length<7)buf+=k;$('disp').textContent=buf||'—'}
+function check(){if(!buf)return;const m=TM[cur],q=m.q;
+if(+buf==q.a){m.done=1;solved++;hud();sOk();emp={x:m.x*T+8,y:m.y*T+8,r:0};Z.forEach(z=>z.stun=6);burst(m.x*T+8,m.y*T+8,'#39ff88',30);
+ov(`<h2>✅ Acesso liberado!</h2><p>Resposta: <b class="ok">${q.a}</b></p><div class="fm">${q.s}</div><p>Pulso EMP ativado: zumbis paralisados por 6s!</p><button class="go" onclick="after()">CONTINUAR</button>`)}
+else{err++;sBad();alertT=6;m.q=m.g();
+ov(`<h2 class="no">❌ Código incorreto!</h2><p>Sua resposta: <b class="no">${buf}</b> · Correta: <b class="ok">${q.a}</b></p><div class="fm">${q.s}</div><p>O alarme disparou — os zumbis ouviram! Tente outro desafio neste terminal.</p><button class="go" onclick="after()">CONTINUAR</button>`)}}
+function after(){cl();st='play';if(solved==TOT&&!open){open=true;snd(200,.8,'sawtooth',.08,400);msg('🚪 Saída aberta! Fuja pelo portão no topo!')}else msg(alertT>0?'🚨 Alarme! Fuja dos zumbis!':'Terminal ativo! Procure o próximo ⚡')}
+function win(){st='end';sOk();ov(`<h2>🏆 Você escapou!</h2><p>O antídoto foi sintetizado e o Dr. Aris saiu vivo do Laboratório Ômega.</p><div class="fm">Tempo: ${Math.round(time)}s<br>Erros: ${err}<br>Vidas restantes: ${hp}/3</div><button class="go" onclick="start()">JOGAR DE NOVO</button>`)}
+function dead(){st='end';sBad();ov(`<h2 class="no">💀 Você foi infectado</h2><p>Os zumbis pegaram o Dr. Aris. Terminais ativados: ${solved}/${TOT}.</p>${FM}<button class="go" onclick="start()">TENTAR DE NOVO</button>`)}
+// ---------- entrada ----------
+const KM={ArrowLeft:'l',a:'l',ArrowRight:'r',d:'r',ArrowUp:'u',w:'u',ArrowDown:'d',s:'d'};
+addEventListener('keydown',e=>{const k=KM[e.key];if(st=='play'){if(k){keys[k]=1;e.preventDefault()}if(e.key=='e'||e.key==' ')act()}else if(st=='modal'&&$('disp')){if(/^\d$/.test(e.key))key(e.key);else if(e.key=='Backspace')key('⌫');else if(e.key=='Enter')key('OK')}});
+addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0});
+document.querySelectorAll('[data-d]').forEach(b=>{const d=b.dataset.d,on=e=>{e.preventDefault();dp[d]=1},off=e=>{e.preventDefault();dp[d]=0};b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(n=>b.addEventListener(n,off))});
+$('act').addEventListener('pointerdown',e=>{e.preventDefault();act()});
+$('menu').onclick=()=>{if(st=='play')guide(false)};
+reset();guide(true);
+let lt=0;(function loop(ts){const dt=Math.min(.05,(ts-lt)/1000||0);lt=ts;if(st=='play')upd(dt);draw(tA+ts/1000*0);requestAnimationFrame(loop)})(0);
+setInterval(()=>{if(st!='play')tA+=.016},16);
+</script></body></html>
